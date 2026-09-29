@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:zeebe="http://camunda.org/schema/zeebe/1.0" xmlns:modeler="http://camunda.org/schema/modeler/1.0" id="Definitions_HotelRoomReservation" targetNamespace="http://bpmn.io/schema/bpmn" exporter="Camunda Modeler" exporterVersion="5.49.0" modeler:executionPlatform="Camunda Cloud" modeler:executionPlatformVersion="8.8.0">
+  <bpmn:process id="Process_HotelRoomReservation" name="Hotel Room Reservation" isExecutable="true">
+    <bpmn:documentation>Online hotel room booking: availability check, advance payment, confirmation.</bpmn:documentation>
+    <bpmn:startEvent id="StartEvent_BookingRequestSubmitted" name="Booking request submitted">
+      <bpmn:documentation>Guest submits a room booking request with check-in and check-out dates.</bpmn:documentation>
+      <bpmn:outgoing>Flow_BookingRequestSubmitted_to_CheckRoomAvailability</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:serviceTask id="Activity_CheckRoomAvailability" name="Check room availability">
+      <bpmn:documentation>Reservation system checks room availability for the requested dates.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="check-room-availability" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_BookingRequestSubmitted_to_CheckRoomAvailability</bpmn:incoming>
+      <bpmn:outgoing>Flow_CheckRoomAvailability_to_RoomsAvailable</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_RoomsAvailable" name="Rooms available?">
+      <bpmn:incoming>Flow_CheckRoomAvailability_to_RoomsAvailable</bpmn:incoming>
+      <bpmn:outgoing>Flow_RoomsAvailable_to_RequestAdvancePayment</bpmn:outgoing>
+      <bpmn:outgoing>Flow_RoomsAvailable_to_NotifyNoRooms</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Activity_RequestAdvancePayment" name="Request advance payment">
+      <bpmn:documentation>System requests the advance/deposit payment from the guest.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="request-advance-payment" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_RoomsAvailable_to_RequestAdvancePayment</bpmn:incoming>
+      <bpmn:outgoing>Flow_RequestAdvancePayment_to_PaymentSuccessful</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:exclusiveGateway id="Gateway_PaymentSuccessful" name="Payment successful?">
+      <bpmn:incoming>Flow_RequestAdvancePayment_to_PaymentSuccessful</bpmn:incoming>
+      <bpmn:outgoing>Flow_PaymentSuccessful_to_ConfirmBooking</bpmn:outgoing>
+      <bpmn:outgoing>Flow_PaymentSuccessful_to_NotifyPaymentFailure</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:serviceTask id="Activity_ConfirmBooking" name="Confirm booking &amp; generate reference no.">
+      <bpmn:documentation>System confirms the booking and generates a booking reference number.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="confirm-booking" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_PaymentSuccessful_to_ConfirmBooking</bpmn:incoming>
+      <bpmn:outgoing>Flow_ConfirmBooking_to_SendConfirmationEmail</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="Activity_SendConfirmationEmail" name="Send booking confirmation email">
+      <bpmn:documentation>System emails the booking confirmation with reservation details to the guest.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="send-confirmation-email" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_ConfirmBooking_to_SendConfirmationEmail</bpmn:incoming>
+      <bpmn:outgoing>Flow_SendConfirmationEmail_to_BookingConfirmed</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="EndEvent_BookingConfirmed" name="Booking confirmed">
+      <bpmn:incoming>Flow_SendConfirmationEmail_to_BookingConfirmed</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Activity_NotifyNoRooms" name="Notify guest that no rooms are available">
+      <bpmn:documentation>System notifies the guest that no rooms are available for the requested dates.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="notify-no-rooms" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_RoomsAvailable_to_NotifyNoRooms</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyNoRooms_to_NoRoomsAvailable</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="EndEvent_NoRoomsAvailable" name="No rooms available">
+      <bpmn:incoming>Flow_NotifyNoRooms_to_NoRoomsAvailable</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sendTask id="Activity_NotifyPaymentFailure" name="Notify guest of payment failure">
+      <bpmn:documentation>System notifies the guest that the payment failed.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="notify-payment-failure" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>Flow_PaymentSuccessful_to_NotifyPaymentFailure</bpmn:incoming>
+      <bpmn:outgoing>Flow_NotifyPaymentFailure_to_PaymentFailed</bpmn:outgoing>
+    </bpmn:sendTask>
+    <bpmn:endEvent id="EndEvent_PaymentFailed" name="Payment failed">
+      <bpmn:incoming>Flow_NotifyPaymentFailure_to_PaymentFailed</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:sequenceFlow id="Flow_BookingRequestSubmitted_to_CheckRoomAvailability" sourceRef="StartEvent_BookingRequestSubmitted" targetRef="Activity_CheckRoomAvailability" />
+    <bpmn:sequenceFlow id="Flow_CheckRoomAvailability_to_RoomsAvailable" sourceRef="Activity_CheckRoomAvailability" targetRef="Gateway_RoomsAvailable" />
+    <bpmn:sequenceFlow id="Flow_RoomsAvailable_to_RequestAdvancePayment" name="Yes" sourceRef="Gateway_RoomsAvailable" targetRef="Activity_RequestAdvancePayment">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=roomsAvailable = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_RoomsAvailable_to_NotifyNoRooms" name="No" sourceRef="Gateway_RoomsAvailable" targetRef="Activity_NotifyNoRooms">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=roomsAvailable = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotifyNoRooms_to_NoRoomsAvailable" sourceRef="Activity_NotifyNoRooms" targetRef="EndEvent_NoRoomsAvailable" />
+    <bpmn:sequenceFlow id="Flow_RequestAdvancePayment_to_PaymentSuccessful" sourceRef="Activity_RequestAdvancePayment" targetRef="Gateway_PaymentSuccessful" />
+    <bpmn:sequenceFlow id="Flow_PaymentSuccessful_to_ConfirmBooking" name="Yes" sourceRef="Gateway_PaymentSuccessful" targetRef="Activity_ConfirmBooking">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=paymentSuccessful = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_PaymentSuccessful_to_NotifyPaymentFailure" name="No" sourceRef="Gateway_PaymentSuccessful" targetRef="Activity_NotifyPaymentFailure">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=paymentSuccessful = false</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="Flow_NotifyPaymentFailure_to_PaymentFailed" sourceRef="Activity_NotifyPaymentFailure" targetRef="EndEvent_PaymentFailed" />
+    <bpmn:sequenceFlow id="Flow_ConfirmBooking_to_SendConfirmationEmail" sourceRef="Activity_ConfirmBooking" targetRef="Activity_SendConfirmationEmail" />
+    <bpmn:sequenceFlow id="Flow_SendConfirmationEmail_to_BookingConfirmed" sourceRef="Activity_SendConfirmationEmail" targetRef="EndEvent_BookingConfirmed" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_HotelRoomReservation">
+    <bpmndi:BPMNPlane id="BPMNPlane_HotelRoomReservation" bpmnElement="Process_HotelRoomReservation">
+      <bpmndi:BPMNShape id="StartEvent_BookingRequestSubmitted_di" bpmnElement="StartEvent_BookingRequestSubmitted">
+        <dc:Bounds x="150" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="123" y="205" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_CheckRoomAvailability_di" bpmnElement="Activity_CheckRoomAvailability">
+        <dc:Bounds x="241" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_RoomsAvailable_di" bpmnElement="Gateway_RoomsAvailable" isMarkerVisible="true">
+        <dc:Bounds x="396" y="155" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="361" y="115" width="120" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_RequestAdvancePayment_di" bpmnElement="Activity_RequestAdvancePayment">
+        <dc:Bounds x="501" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_PaymentSuccessful_di" bpmnElement="Gateway_PaymentSuccessful" isMarkerVisible="true">
+        <dc:Bounds x="656" y="155" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="621" y="115" width="120" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_ConfirmBooking_di" bpmnElement="Activity_ConfirmBooking">
+        <dc:Bounds x="761" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_SendConfirmationEmail_di" bpmnElement="Activity_SendConfirmationEmail">
+        <dc:Bounds x="916" y="140" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_BookingConfirmed_di" bpmnElement="EndEvent_BookingConfirmed">
+        <dc:Bounds x="1071" y="162" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="1044" y="205" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_NotifyNoRooms_di" bpmnElement="Activity_NotifyNoRooms">
+        <dc:Bounds x="371" y="310" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_NoRoomsAvailable_di" bpmnElement="EndEvent_NoRoomsAvailable">
+        <dc:Bounds x="543" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="516" y="375" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_NotifyPaymentFailure_di" bpmnElement="Activity_NotifyPaymentFailure">
+        <dc:Bounds x="631" y="310" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_PaymentFailed_di" bpmnElement="EndEvent_PaymentFailed">
+        <dc:Bounds x="803" y="332" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="776" y="375" width="90" height="27" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_BookingRequestSubmitted_to_CheckRoomAvailability_di" bpmnElement="Flow_BookingRequestSubmitted_to_CheckRoomAvailability">
+        <di:waypoint x="186" y="180" />
+        <di:waypoint x="241" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_CheckRoomAvailability_to_RoomsAvailable_di" bpmnElement="Flow_CheckRoomAvailability_to_RoomsAvailable">
+        <di:waypoint x="341" y="180" />
+        <di:waypoint x="396" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RoomsAvailable_to_RequestAdvancePayment_di" bpmnElement="Flow_RoomsAvailable_to_RequestAdvancePayment">
+        <di:waypoint x="446" y="180" />
+        <di:waypoint x="501" y="180" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="452" y="160" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RoomsAvailable_to_NotifyNoRooms_di" bpmnElement="Flow_RoomsAvailable_to_NotifyNoRooms">
+        <di:waypoint x="421" y="205" />
+        <di:waypoint x="421" y="310" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="429" y="217" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotifyNoRooms_to_NoRoomsAvailable_di" bpmnElement="Flow_NotifyNoRooms_to_NoRoomsAvailable">
+        <di:waypoint x="471" y="350" />
+        <di:waypoint x="543" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_RequestAdvancePayment_to_PaymentSuccessful_di" bpmnElement="Flow_RequestAdvancePayment_to_PaymentSuccessful">
+        <di:waypoint x="601" y="180" />
+        <di:waypoint x="656" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PaymentSuccessful_to_ConfirmBooking_di" bpmnElement="Flow_PaymentSuccessful_to_ConfirmBooking">
+        <di:waypoint x="706" y="180" />
+        <di:waypoint x="761" y="180" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="712" y="160" width="19" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_PaymentSuccessful_to_NotifyPaymentFailure_di" bpmnElement="Flow_PaymentSuccessful_to_NotifyPaymentFailure">
+        <di:waypoint x="681" y="205" />
+        <di:waypoint x="681" y="310" />
+        <bpmndi:BPMNLabel>
+          <dc:Bounds x="689" y="217" width="16" height="14" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_NotifyPaymentFailure_to_PaymentFailed_di" bpmnElement="Flow_NotifyPaymentFailure_to_PaymentFailed">
+        <di:waypoint x="731" y="350" />
+        <di:waypoint x="803" y="350" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_ConfirmBooking_to_SendConfirmationEmail_di" bpmnElement="Flow_ConfirmBooking_to_SendConfirmationEmail">
+        <di:waypoint x="861" y="180" />
+        <di:waypoint x="916" y="180" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_SendConfirmationEmail_to_BookingConfirmed_di" bpmnElement="Flow_SendConfirmationEmail_to_BookingConfirmed">
+        <di:waypoint x="1016" y="180" />
+        <di:waypoint x="1071" y="180" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
